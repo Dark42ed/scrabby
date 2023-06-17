@@ -95,7 +95,7 @@ pub fn get_word_score(board: &Board, word: &str, mut location: usize, direction:
 **THIS DOES NOT GUARANTEE VALID MOVES.**
 
 This function takes in a location (the letter to build off of), and the word, and returns
-a list of [`Move`] structs (positions and orientations) that specify how a word can be positioned
+a list of [`Word`] structs (positions and orientations) that specify how a word can be positioned
 and orientated around the starting letter.
 
 # Example
