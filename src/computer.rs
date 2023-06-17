@@ -2,7 +2,6 @@ use crate::board::Board;
 use crate::board::Direction;
 use crate::board::Word;
 use crate::letter::Letter;
-use crate::letter;
 
 /**
 Returns an iterator over the best moves to play, with the moves
@@ -17,7 +16,7 @@ out later when we iterate through them.
 pub fn best_moves<'a>(board: &'a Board, letters: &[Letter]) -> impl Iterator<Item = Word> + 'a {
     let mut rack = Vec::from(letters);
 
-    let mut best: Vec<(usize, Word)> = Vec::new();
+    let mut best: Vec<(u32, Word)> = Vec::new();
     for (location, letter) in board.enumerate_letters() {
         rack.push(letter);
 
@@ -25,7 +24,7 @@ pub fn best_moves<'a>(board: &'a Board, letters: &[Letter]) -> impl Iterator<Ite
 
         for word in words {
             let move_positions = get_move_positions(board, location, word);
-            best.extend(move_positions.iter().map(|x| (get_word_score(board, x.word.as_ref(), x.location, x.direction), (*x).clone())));
+            best.extend(move_positions.iter().map(|x| (x.get_score(board), (*x).clone())));
         }
 
         rack.pop();
@@ -61,35 +60,6 @@ pub fn can_create_word(rack: &[Letter], word: &str) -> bool {
     }
     true
 }
-
-/**
-Gets the score of a word on the board.
-Accounts for letter and word multipliers
-
-**TODO:**
-* Do not use already used letter or word multipliers
-* Account for blank letters not having any score
-*/
-pub fn get_word_score(board: &Board, word: &str, mut location: usize, direction: Direction) -> usize {
-    let location_change = match direction {
-        Direction::Right => 1,
-        Direction::Down => board.get_size()
-    };
-    let mut sum = 0;
-    let mut word_mul = 1;
-    for l in word.as_bytes() {
-        sum += Letter::from_char(*l as char).score() as usize * letter::LETTER_MULT[location] as usize;
-        if let Some(mul) = letter::WORD_MULT.get(location) {
-            word_mul *= mul;
-        }
-
-        location += location_change;
-    }
-    sum *= word_mul as usize;
-
-    sum
-}
-
 
 /**
 **THIS DOES NOT GUARANTEE VALID MOVES.**

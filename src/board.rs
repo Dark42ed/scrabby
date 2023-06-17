@@ -119,6 +119,36 @@ impl Word {
             word: Cow::Borrowed(word)
         }
     }
+
+    /**
+    Gets the score of a word on the board.
+    Accounts for letter and word multipliers
+
+    **TODO:**
+    * Do not use already used letter or word multipliers
+    * Account for blank letters not having any score
+    */
+    pub fn get_score(&self, board: &Board) -> u32 {
+        let location_change = match self.direction {
+            Direction::Right => 1,
+            Direction::Down => board.get_size()
+        };
+
+        let mut current_location = self.location;
+        let mut sum = 0;
+        let mut word_mul = 1;
+        for l in self.word.chars() {
+            sum += Letter::from_char(l).score() as u32 * crate::letter::LETTER_MULT[current_location] as u32;
+            if let Some(mul) = crate::letter::WORD_MULT.get(current_location) {
+                word_mul *= *mul as u32;
+            }
+    
+            current_location += location_change;
+        }
+        sum *= word_mul;
+    
+        sum
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
