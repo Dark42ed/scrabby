@@ -34,6 +34,7 @@ pub fn best_moves<'a>(board: &'a Board, letters: &[Letter]) -> impl Iterator<Ite
     best.into_iter().rev().filter(move |m| verify_move(&board, &m.1)).map(move |m| m.1)
 }
 
+/// TODO: Word extensions?
 pub fn get_createable_words(rack: &[Letter]) -> impl Iterator<Item = &&'static str> + '_ {
     crate::WORD_LIST.lock().expect("Word list mutex is poisoned").expect("No word list set").iter().filter(|word| can_create_word(rack, word))
 }

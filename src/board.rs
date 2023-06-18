@@ -125,8 +125,8 @@ impl Word {
     Accounts for letter and word multipliers
 
     **TODO:**
-    * Do not use already used letter or word multipliers
     * Account for blank letters not having any score
+    * Word extensions
     */
     pub fn get_score(&self, board: &Board) -> u32 {
         let location_change = match self.direction {
@@ -138,14 +138,25 @@ impl Word {
         let mut sum = 0;
         let mut word_mul = 1;
         for l in self.word.chars() {
-            sum += Letter::from_char(l).score() as u32 * crate::letter::LETTER_MULT[current_location] as u32;
+            let mut letter_mul = 1;
+            if board.get_index(current_location).is_none() {
+                letter_mul = crate::letter::LETTER_MULT[current_location] as u32;
+            }
+            sum += Letter::from_char(l).score() as u32 * letter_mul;
+
             if let Some(mul) = crate::letter::WORD_MULT.get(current_location) {
-                word_mul *= *mul as u32;
+                if board.get_index(current_location).is_none() {
+                    word_mul *= *mul as u32;
+                }
             }
     
             current_location += location_change;
         }
         sum *= word_mul;
+
+        if self.word.len() == 8 {
+            sum += 50;
+        }
     
         sum
     }
