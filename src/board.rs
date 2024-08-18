@@ -4,11 +4,14 @@ use colored::Colorize;
 use std::borrow::Cow;
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde_derive::Serialize, serde_derive::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Serialize, serde_derive::Deserialize)
+)]
 pub struct Board {
     inner: Vec<Option<Letter>>,
     moves: Vec<Word>,
-    size: usize
+    size: usize,
 }
 
 impl Board {
@@ -17,12 +20,16 @@ impl Board {
         Board {
             inner: vec![None; size * size],
             moves: Vec::new(),
-            size
+            size,
         }
     }
 
-    pub fn get_size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn moves(&self) -> &[Word] {
+        &self.moves
     }
 
     pub fn iter_letters(&self) -> impl Iterator<Item = Letter> + '_ {
@@ -30,22 +37,31 @@ impl Board {
     }
 
     pub fn enumerate_letters(&self) -> impl Iterator<Item = (usize, Letter)> + '_ {
-        self.inner.iter().enumerate().filter_map(|x| x.1.map(|y| (x.0, y)))
+        self.inner
+            .iter()
+            .enumerate()
+            .filter_map(|x| x.1.map(|y| (x.0, y)))
     }
 
-    pub fn make_move(&mut self, mut row: usize, mut column: usize, word: &'static str, direction: Direction) {
+    pub fn make_move(
+        &mut self,
+        mut row: usize,
+        mut column: usize,
+        word: &'static str,
+        direction: Direction,
+    ) {
         for char in word.chars() {
             self.set(row, column, Some(Letter::from_char(char)));
             match direction {
                 Direction::Down => row += 1,
-                Direction::Right => column += 1
+                Direction::Right => column += 1,
             };
         }
 
         self.moves.push(Word::new(
             self.convert_to_index(row, column),
             direction,
-            word,
+            Cow::Borrowed(word),
         ));
     }
 
@@ -76,10 +92,13 @@ impl Board {
 
     pub fn print(&self) {
         for i in 0..self.size {
-            for l in self.inner[i*self.size..(i+1)*self.size].iter().map(|x| match x {
-                Some(y) => y.to_char(),
-                None => '.'    
-            }) {
+            for l in self.inner[i * self.size..(i + 1) * self.size]
+                .iter()
+                .map(|x| match x {
+                    Some(y) => y.to_char(),
+                    None => '.',
+                })
+            {
                 print!("{} ", l);
             }
             println!();
@@ -104,19 +123,22 @@ impl Board {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde_derive::Serialize, serde_derive::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Serialize, serde_derive::Deserialize)
+)]
 pub struct Word {
     pub location: usize,
     pub direction: Direction,
-    pub word: Cow<'static, str>
+    pub word: String,
 }
 
 impl Word {
-    pub fn new(location: usize, direction: Direction, word: &'static str) -> Word {
+    pub fn new(location: usize, direction: Direction, word: Cow<'_, str>) -> Word {
         Word {
             location,
             direction,
-            word: Cow::Borrowed(word)
+            word: word.into_owned(),
         }
     }
 
@@ -131,7 +153,7 @@ impl Word {
     pub fn get_score(&self, board: &Board) -> u32 {
         let location_change = match self.direction {
             Direction::Right => 1,
-            Direction::Down => board.get_size()
+            Direction::Down => board.size(),
         };
 
         let mut current_location = self.location;
@@ -149,7 +171,7 @@ impl Word {
                     word_mul *= *mul as u32;
                 }
             }
-    
+
             current_location += location_change;
         }
         sum *= word_mul;
@@ -157,15 +179,33 @@ impl Word {
         if self.word.len() == 8 {
             sum += 50;
         }
-    
+
         sum
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde_derive::Serialize, serde_derive::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Serialize, serde_derive::Deserialize)
+)]
 pub enum Direction {
     Right,
-    Down
+    Down,
 }
 
+impl Direction {
+    pub fn opposite(&self) -> Direction {
+        match self {
+            Self::Right => Self::Down,
+            Self::Down => Self::Right,
+        }
+    }
+
+    pub fn offset(&self, board_size: usize) -> usize {
+        match self {
+            Self::Right => 1,
+            Self::Down => board_size,
+        }
+    }
+}

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::board::Board;
 use crate::board::Direction;
 use crate::board::Word;
@@ -13,34 +15,40 @@ the word score. Since generating the score is relatively cheap,
 we can generate it even for the invalid moves, and prune them
 out later when we iterate through them.
 */
-pub fn best_moves<'a>(board: &'a Board, letters: &[Letter]) -> impl Iterator<Item = Word> + 'a {
+pub fn best_moves<'a>(
+    board: &'a Board,
+    letters: &[Letter],
+    word_list: &'a [&str],
+) -> impl Iterator<Item = Word> + 'a {
     let mut rack = Vec::from(letters);
 
     let mut best: Vec<(u32, Word)> = Vec::new();
     for (location, letter) in board.enumerate_letters() {
         rack.push(letter);
 
-        let words = get_createable_words(&rack);
+        let words = word_list.iter().filter(|word| can_create_word(&rack, word));
 
         for word in words {
             let move_positions = get_move_positions(board, location, word);
-            best.extend(move_positions.iter().map(|x| (x.get_score(board), (*x).clone())));
+            best.extend(
+                move_positions
+                    .iter()
+                    .map(|x| (x.get_score(board), (*x).clone())),
+            );
         }
 
         rack.pop();
     }
 
     best.sort_unstable_by_key(|x| x.0);
-    best.into_iter().rev().filter(move |m| verify_move(&board, &m.1)).map(move |m| m.1)
-}
-
-/// TODO: Word extensions?
-pub fn get_createable_words(rack: &[Letter]) -> impl Iterator<Item = &&'static str> + '_ {
-    crate::WORD_LIST.lock().expect("Word list mutex is poisoned").expect("No word list set").iter().filter(|word| can_create_word(rack, word))
+    best.into_iter()
+        .rev()
+        .filter(move |m| verify_move(&board, &m.1, word_list))
+        .map(move |m| m.1)
 }
 
 /**
-Returns if you can create the word `word` using the letters in `rack` 
+Returns if you can create the word `word` using the letters in `rack`
 */
 pub fn can_create_word(rack: &[Letter], word: &str) -> bool {
     let mut rack = Vec::from(rack);
@@ -85,23 +93,24 @@ let positions = computer::get_move_positions(&board, board.convert_to_index(11, 
 assert_eq!(positions.len(), 4);
 ```
 */
-pub fn get_move_positions(board: &Board, location: usize, word: &'static str) -> Vec<Word> {
+pub fn get_move_positions(board: &Board, location: usize, word: &str) -> Vec<Word> {
     // Consider using smallvec for performance?
     let mut good_ones = Vec::new();
 
     for direction in [Direction::Down, Direction::Right] {
-        for letter in word.as_bytes().iter().enumerate().filter(|x| Letter::from_char(*x.1 as char) == board.get_index(location).unwrap()) {
+        for letter in word
+            .as_bytes()
+            .iter()
+            .enumerate()
+            .filter(|x| Letter::from_char(*x.1 as char) == board.get_index(location).unwrap())
+        {
             let string_position = letter.0;
             let starting_position = match direction {
-                Direction::Down => location - (string_position * board.get_size()),
-                Direction::Right => location - string_position
+                Direction::Down => location - (string_position * board.size()),
+                Direction::Right => location - string_position,
             };
 
-            good_ones.push(Word::new(
-                starting_position,
-                direction,
-                word
-            ));
+            good_ones.push(Word::new(starting_position, direction, Cow::Borrowed(word)));
         }
     }
 
@@ -114,38 +123,98 @@ Verify if a move is able to be played on the board.
 # Checks
 * Does a word go off the board
 * Does a word replace letters in another word
+* Does a word make valid words in all the places it is parallel to a different word
 
 **TODO:**
-* Does a word make valid words in all the places it is parallel to a different word?
+* Verify move extensions
 */
-pub fn verify_move(board: &Board, board_move: &Word) -> bool {
+pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool {
     let (starting_column, starting_row) = board.convert_from_index(board_move.location);
 
     for (i, word_letter) in board_move.word.as_bytes().iter().enumerate() {
         let test_position = match board_move.direction {
-            Direction::Down => board_move.location.wrapping_add(i * board.get_size()),
-            Direction::Right => board_move.location.wrapping_add(i)
+            Direction::Down => board_move.location.wrapping_add(i * board.size()),
+            Direction::Right => board_move.location.wrapping_add(i),
         };
 
-        let (current_column, current_row) = board.convert_from_index(test_position);
+        let (current_col, current_row) = board.convert_from_index(test_position);
+        // Check if it goes off the board
         if match board_move.direction {
-            Direction::Down => current_column != starting_column,
-            Direction::Right => current_row != starting_row
+            Direction::Down => current_col != starting_column,
+            Direction::Right => current_row != starting_row,
         } {
             return false;
         }
 
-        if test_position >= board.get_size().pow(2) {
+        if test_position >= board.size().pow(2) {
             return false;
         }
-        
+
+        // Check if there is already a different letter
         let test = board.get_index(test_position);
         if let Some(test_inner) = test {
             if test_inner != Letter::from_char(*word_letter as char) {
                 return false;
             }
         }
+
+        // Check that parallel words formed are valid
+        let (start_bound, end_bound) = (
+            find_bound(board, test_position, board_move.direction.opposite(), true),
+            find_bound(board, test_position, board_move.direction.opposite(), false),
+        );
+
+        let mut new_word = String::new();
+        let mut i = start_bound;
+        if start_bound != end_bound {
+            while i <= end_bound {
+                new_word.push(if i == test_position {
+                    *word_letter as char
+                } else {
+                    board.get_index(i).unwrap().to_char()
+                });
+                i += board_move.direction.opposite().offset(board.size());
+            }
+        }
+
+        if !new_word.is_empty()
+            && !(word_list.contains(&&*new_word)
+                || board
+                    .moves()
+                    .iter()
+                    .map(|mov| &mov.word)
+                    .find(|word| **word == new_word)
+                    .is_some())
+        {
+            return false;
+        }
     }
 
     return true;
+}
+
+fn find_bound(board: &Board, start: usize, direction: Direction, direction_flip: bool) -> usize {
+    let (start_row, start_col) = board.convert_from_index(start);
+    let mut bound = start;
+    let offset = direction.offset(board.size());
+    loop {
+        if direction_flip {
+            bound -= offset;
+        } else {
+            bound += offset;
+        }
+        if board.get_index(bound).is_none()
+            || match direction {
+                Direction::Right => start_col != board.convert_from_index(bound).1,
+                Direction::Down => start_row != board.convert_from_index(bound).0,
+            }
+        {
+            if direction_flip {
+                bound += offset;
+            } else {
+                bound -= offset;
+            }
+            return bound;
+        }
+    }
 }
