@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use crate::board::Board;
 use crate::board::Direction;
+use crate::board::Position;
 use crate::board::Word;
 use crate::letter::Letter;
 
@@ -93,8 +94,7 @@ let positions = computer::get_move_positions(&board, board.convert_to_index(11, 
 assert_eq!(positions.len(), 4);
 ```
 */
-pub fn get_move_positions(board: &Board, location: usize, word: &str) -> Vec<Word> {
-    // Consider using smallvec for performance?
+pub fn get_move_positions(board: &Board, location: Position, word: &str) -> Vec<Word> {
     let mut good_ones = Vec::new();
 
     for direction in [Direction::Down, Direction::Right] {
@@ -102,14 +102,10 @@ pub fn get_move_positions(board: &Board, location: usize, word: &str) -> Vec<Wor
             .as_bytes()
             .iter()
             .enumerate()
-            .filter(|x| Letter::from_char(*x.1 as char) == board.get_index(location).unwrap())
+            .filter(|x| Letter::from_char(*x.1 as char) == board.get(location).unwrap())
         {
             let string_position = letter.0;
-            let starting_position = match direction {
-                Direction::Down => location - (string_position * board.size()),
-                Direction::Right => location - string_position,
-            };
-
+            let starting_position = location.add_direction(direction, -(string_position as isize));
             good_ones.push(Word::new(starting_position, direction, Cow::Borrowed(word)));
         }
     }
@@ -129,92 +125,91 @@ Verify if a move is able to be played on the board.
 * Verify move extensions
 */
 pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool {
-    let (starting_column, starting_row) = board.convert_from_index(board_move.location);
+    let (starting_column, starting_row) = board_move.position.as_row_column();
+
+    // Verify the word is in bounds
+    if board_move
+        .position
+        .try_add_direction(board_move.direction, board_move.word.len() as isize)
+        .is_none()
+    {
+        return false;
+    }
 
     for (i, word_letter) in board_move.word.as_bytes().iter().enumerate() {
-        let test_position = match board_move.direction {
-            Direction::Down => board_move.location.wrapping_add(i * board.size()),
-            Direction::Right => board_move.location.wrapping_add(i),
-        };
-
-        let (current_col, current_row) = board.convert_from_index(test_position);
-        // Check if it goes off the board
-        if match board_move.direction {
-            Direction::Down => current_col != starting_column,
-            Direction::Right => current_row != starting_row,
-        } {
-            return false;
-        }
-
-        if test_position >= board.size().pow(2) {
-            return false;
-        }
+        let test_position = board_move.position.add_direction(board_move.direction, 1);
 
         // Check if there is already a different letter
-        let test = board.get_index(test_position);
+        let test = board.get(test_position);
         if let Some(test_inner) = test {
             if test_inner != Letter::from_char(*word_letter as char) {
                 return false;
             }
         }
 
-        // Check that parallel words formed are valid
-        let (start_bound, end_bound) = (
-            find_bound(board, test_position, board_move.direction.opposite(), true),
-            find_bound(board, test_position, board_move.direction.opposite(), false),
-        );
+        // Check that all words formed are valid
+        for direction in [Direction::Right, Direction::Down] {
+            let new_word =
+                find_boundary_word(board, test_position, *word_letter as char, direction);
 
-        let mut new_word = String::new();
-        let mut i = start_bound;
-        if start_bound != end_bound {
-            while i <= end_bound {
-                new_word.push(if i == test_position {
-                    *word_letter as char
-                } else {
-                    board.get_index(i).unwrap().to_char()
-                });
-                i += board_move.direction.opposite().offset(board.size());
+            println!("Checking word {}", new_word);
+            if !new_word.is_empty()
+                && !(word_list.contains(&&*new_word)
+                    || board
+                        .moves()
+                        .iter()
+                        .map(|mov| &mov.word)
+                        .find(|word| **word == new_word)
+                        .is_some())
+            {
+                return false;
             }
-        }
-
-        if !new_word.is_empty()
-            && !(word_list.contains(&&*new_word)
-                || board
-                    .moves()
-                    .iter()
-                    .map(|mov| &mov.word)
-                    .find(|word| **word == new_word)
-                    .is_some())
-        {
-            return false;
         }
     }
 
     return true;
 }
 
-fn find_bound(board: &Board, start: usize, direction: Direction, direction_flip: bool) -> usize {
-    let (start_row, start_col) = board.convert_from_index(start);
-    let mut bound = start;
-    let offset = direction.offset(board.size());
-    loop {
-        if direction_flip {
-            bound -= offset;
-        } else {
-            bound += offset;
-        }
-        if board.get_index(bound).is_none()
-            || match direction {
-                Direction::Right => start_col != board.convert_from_index(bound).1,
-                Direction::Down => start_row != board.convert_from_index(bound).0,
-            }
-        {
-            if direction_flip {
-                bound += offset;
+fn find_boundary_word(
+    board: &Board,
+    start: Position,
+    start_char: char,
+    direction: Direction,
+) -> String {
+    let (start_bound, end_bound) = (
+        find_bound(board, start, direction, true),
+        find_bound(board, start, direction, false),
+    );
+
+    let mut new_word = String::new();
+    let mut i = start_bound;
+    if start_bound != end_bound {
+        while i <= end_bound {
+            new_word.push(if i == start {
+                start_char
             } else {
-                bound -= offset;
-            }
-            return bound;
+                board.get(i).unwrap().to_char()
+            });
+            i = i.add_direction(direction, 1);
+        }
+    }
+
+    return new_word;
+}
+
+fn find_bound(
+    board: &Board,
+    start: Position,
+    direction: Direction,
+    direction_flip: bool,
+) -> Position {
+    let mut bound = start;
+    loop {
+        let next = bound.try_add_direction(direction, if direction_flip { -1 } else { 1 });
+        match next {
+            None => return bound,
+            Some(next) if board.get(next).is_none() => return bound,
+            Some(next) => bound = next,
         }
     }
 }
