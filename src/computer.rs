@@ -82,15 +82,15 @@ and orientated around the starting letter.
 ```
 use scrabby::{
     Board, Direction,
-    computer
+    computer, Position
 };
 
 let mut board = Board::new(Board::DEFAULT_SS_BOARD_SIZE);
-board.make_move(11, 11, "HELLO", Direction::Right);
+board.make_move(Position::new(board.size(), 11, 11), "HELLO", Direction::Right);
 
 // "EWE" can be orientated 4 different ways around the 'E' in "HELLO".
 // 2 from the first 'E' and 2 from the second 'E'. 2 vertically and 2 horizontally.
-let positions = computer::get_move_positions(&board, board.convert_to_index(11, 12), "EWE");
+let positions = computer::get_move_positions(&board, Position::new(board.size(), 11, 12), "EWE");
 assert_eq!(positions.len(), 4);
 ```
 */
