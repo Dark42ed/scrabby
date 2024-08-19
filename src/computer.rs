@@ -125,8 +125,6 @@ Verify if a move is able to be played on the board.
 * Verify move extensions
 */
 pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool {
-    let (starting_column, starting_row) = board_move.position.as_row_column();
-
     // Verify the word is in bounds
     if board_move
         .position
@@ -137,7 +135,9 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
     }
 
     for (i, word_letter) in board_move.word.as_bytes().iter().enumerate() {
-        let test_position = board_move.position.add_direction(board_move.direction, 1);
+        let test_position = board_move
+            .position
+            .add_direction(board_move.direction, i as isize);
 
         // Check if there is already a different letter
         let test = board.get(test_position);
@@ -149,10 +149,14 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
 
         // Check that all words formed are valid
         for direction in [Direction::Right, Direction::Down] {
-            let new_word =
-                find_boundary_word(board, test_position, *word_letter as char, direction);
+            let new_word = find_boundary_word(
+                board,
+                test_position,
+                *word_letter as char,
+                board_move,
+                direction,
+            );
 
-            println!("Checking word {}", new_word);
             if !new_word.is_empty()
                 && !(word_list.contains(&&*new_word)
                     || board
@@ -174,6 +178,7 @@ fn find_boundary_word(
     board: &Board,
     start: Position,
     start_char: char,
+    word: &Word,
     direction: Direction,
 ) -> String {
     let (start_bound, end_bound) = (
@@ -185,6 +190,7 @@ fn find_boundary_word(
     let mut i = start_bound;
     if start_bound != end_bound {
         while i <= end_bound {
+            // TODO: Fix for the entire word
             new_word.push(if i == start {
                 start_char
             } else {
