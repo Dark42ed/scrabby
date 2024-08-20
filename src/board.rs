@@ -1,7 +1,7 @@
 #![allow(dead_code)]
-use crate::letter::Letter;
+use crate::{computer, letter::Letter};
 use core::fmt;
-use std::{borrow::Cow, ops::Add};
+use std::{borrow::Cow, ops::Add, sync::Arc};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(
@@ -209,40 +209,46 @@ impl Word {
     /**
     Gets the score of a word on the board.
     Accounts for letter and word multipliers
+    Word extensions
 
     **TODO:**
-    * Word extensions
     * Account for blank letters not having any score
     */
-    pub fn get_score(&self, board: &Board) -> u32 {
-        let mut current_location = self.position;
+    // secondary defines whether this word scoring is a result of another word, and therefore
+    // * Premiums will not be scored (except for the common letter)
+    // * It will not branch into any new words
+    pub fn get_score(&self, board: &Board, secondary_common_letter: Option<usize>) -> u32 {
         let mut sum = 0;
+        // Contains letters from other words which are not scored with the word_mul or letter_mul
+        let mut post_sum = 0;
         let mut word_mul = 1;
-        for l in self.word.chars() {
+
+        for (i, char) in self.word.chars().enumerate() {
+            let location = self.position.add_direction(self.direction, i as isize);
             let mut letter_mul = 1;
-            if board.get(current_location).is_none() {
+            if secondary_common_letter.is_none()
+                || secondary_common_letter.is_some_and(|secondary| i == secondary)
+            {
                 letter_mul = crate::letter::LETTER_MULT
-                    .get(current_location.index)
+                    .get(location.as_index())
                     .cloned()
-                    .unwrap_or(0) as u32;
+                    .unwrap_or(1) as u32;
+                word_mul *= crate::letter::WORD_MULT
+                    .get(location.as_index())
+                    .cloned()
+                    .unwrap_or(1) as u32;
             }
-            sum += Letter::from_char(l).score() as u32 * letter_mul;
-
-            if let Some(mul) = crate::letter::WORD_MULT.get(current_location.index) {
-                if board.get(current_location).is_none() {
-                    word_mul *= *mul as u32;
-                }
+            if secondary_common_letter.is_none() && board.get(location).is_none() {
+                let boundary_word =
+                    computer::find_boundary_word(board, self, i, self.direction.opposite());
+                let word_offset = (location.as_index() - boundary_word.position.as_index())
+                    / boundary_word.direction.offset(board.size());
+                post_sum += boundary_word.get_score(board, Some(word_offset));
             }
-
-            current_location = current_location.add_direction(self.direction, 1);
-        }
-        sum *= word_mul;
-
-        if self.word.len() == 8 {
-            sum += 50;
+            sum += Letter::from_char(char).raw_score() as u32 * letter_mul;
         }
 
-        sum
+        sum * word_mul + post_sum
     }
 }
 

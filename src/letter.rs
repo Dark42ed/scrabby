@@ -1,4 +1,4 @@
-lazy_static::lazy_static!{
+lazy_static::lazy_static! {
     pub static ref WORD_MULT: &'static [u8] = Box::leak("
         4......3.....3......4
         .2......2...2......2.
@@ -49,7 +49,10 @@ lazy_static::lazy_static!{
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde_derive::Serialize, serde_derive::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Serialize, serde_derive::Deserialize)
+)]
 #[allow(unused)]
 #[repr(u8)]
 pub enum Letter {
@@ -79,7 +82,7 @@ pub enum Letter {
     X,
     Y,
     Z,
-    Blank
+    Blank,
 }
 
 impl Letter {
@@ -88,9 +91,7 @@ impl Letter {
             ' ' => Self::Blank,
             _ => {
                 assert!(c.is_ascii_uppercase());
-                unsafe {
-                    core::mem::transmute(c as u8)
-                }
+                unsafe { core::mem::transmute(c as u8) }
             }
         }
     }
@@ -98,11 +99,11 @@ impl Letter {
     pub fn to_char(self) -> char {
         match self {
             Self::Blank => ' ',
-            _ => self as u8 as char
+            _ => self as u8 as char,
         }
     }
 
-    pub fn score(self) -> u8 {
+    pub fn raw_score(self) -> u8 {
         match self {
             Letter::A => 1,
             Letter::B => 3,
@@ -130,7 +131,7 @@ impl Letter {
             Letter::X => 8,
             Letter::Y => 4,
             Letter::Z => 10,
-            Letter::Blank => 0
+            Letter::Blank => 0,
         }
     }
 }

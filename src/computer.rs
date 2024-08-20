@@ -31,11 +31,12 @@ pub fn best_moves<'a>(
 
         for word in words {
             let move_positions = get_move_positions(board, location, word);
-            best.extend(
-                move_positions
-                    .iter()
-                    .map(|x| (x.get_score(board), (*x).clone())),
-            );
+            best.extend(move_positions.iter().map(|x| {
+                (
+                    x.get_score(board, None) + if rack.len() == 8 { 50 } else { 0 },
+                    (*x).clone(),
+                )
+            }));
         }
 
         rack.pop();
@@ -134,7 +135,7 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
     }
 
     // Verify move extensions
-    let new_word = find_boundary_word(board, board_move, 0, board_move.direction);
+    let new_word = find_boundary_word(board, board_move, 0, board_move.direction).word;
     if !new_word.is_empty()
         && !(word_list.contains(&&*new_word)
             || board
@@ -161,7 +162,8 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
         }
 
         // Check that all perpendicular words formed are valid
-        let new_word = find_boundary_word(board, board_move, i, board_move.direction.opposite());
+        let new_word =
+            find_boundary_word(board, board_move, i, board_move.direction.opposite()).word;
         if !new_word.is_empty()
             && !(word_list.contains(&&*new_word)
                 || board
@@ -178,12 +180,12 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
     return true;
 }
 
-fn find_boundary_word(
+pub fn find_boundary_word(
     board: &Board,
     word: &Word,
     word_offset: usize,
     direction: Direction,
-) -> String {
+) -> Word {
     let start = word
         .position
         .add_direction(word.direction, word_offset as isize);
@@ -204,16 +206,20 @@ fn find_boundary_word(
         bounds[i] = bound;
     }
     let [start_bound, end_bound] = bounds;
-    let mut new_word = String::new();
+    let mut boundary_word = String::new();
     let mut i = start_bound;
     if start_bound != end_bound {
         while i.as_index() <= end_bound.as_index() {
-            new_word.push(get_with_word(board, word, i).unwrap().to_char());
+            boundary_word.push(get_with_word(board, word, i).unwrap().to_char());
             i = i.add_direction(direction, 1);
         }
     }
 
-    return new_word;
+    return Word {
+        position: start_bound,
+        direction,
+        word: boundary_word,
+    };
 }
 
 fn get_with_word(board: &Board, word: &Word, position: Position) -> Option<Letter> {
@@ -240,8 +246,8 @@ mod tests {
 
     fn init_board() -> Board {
         let mut b = Board::new(Board::DEFAULT_SS_BOARD_SIZE);
-        b.make_move(Position::new(b.size(), 11, 11), "RUST", Direction::Right);
-        b.make_move(Position::new(b.size(), 11, 11), "RADICAL", Direction::Down);
+        b.make_move(Position::new(b.size(), 10, 10), "RUST", Direction::Right);
+        b.make_move(Position::new(b.size(), 10, 10), "RADICAL", Direction::Down);
         b
     }
 
@@ -271,13 +277,28 @@ mod tests {
             computer::verify_move(
                 &b,
                 &Word::new(
-                    Position::new(b.size(), 10, 12),
+                    Position::new(b.size(), 11, 9),
                     Direction::Right,
                     Cow::Borrowed("RUST")
                 ),
                 &crate::DEFAULT_WORD_LIST
             ),
             false
+        );
+    }
+
+    #[test]
+    fn move_scoring() {
+        let b = init_board();
+        b.print();
+        assert_eq!(
+            Word::new(
+                Position::new(b.size(), 11, 9),
+                Direction::Right,
+                Cow::Borrowed("TAP")
+            )
+            .get_score(&b, None),
+            16
         );
     }
 }
