@@ -2,7 +2,7 @@
 use crate::letter::Letter;
 use colored::Colorize;
 use core::fmt;
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Add};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(
@@ -63,7 +63,7 @@ impl Board {
     }
 
     pub fn get(&self, position: Position) -> Option<Letter> {
-        self.inner[position.index]
+        self.inner.get(position.index).cloned().flatten()
     }
 
     pub fn set(&mut self, position: Position, letter: Option<Letter>) {
@@ -120,8 +120,16 @@ impl Position {
         }
     }
 
+    pub fn from_index(&self, board_size: usize, index: usize) -> Position {
+        Position { board_size, index }
+    }
+
     pub fn as_row_column(&self) -> (usize, usize) {
         (self.index % self.board_size, self.index / self.board_size)
+    }
+
+    pub fn as_index(&self) -> usize {
+        self.index
     }
 
     pub fn add_row(self, amount: isize) -> Position {
@@ -157,7 +165,8 @@ impl Position {
             .checked_add_signed(direction.offset(self.board_size) as isize * amount)
             .unwrap();
         if new_index > self.board_size.pow(2)
-            || self.index / self.board_size != new_index / self.board_size
+            || (direction == Direction::Right
+                && self.index / self.board_size != new_index / self.board_size)
         {
             None
         } else {
@@ -211,7 +220,10 @@ impl Word {
         for l in self.word.chars() {
             let mut letter_mul = 1;
             if board.get(current_location).is_none() {
-                letter_mul = crate::letter::LETTER_MULT[current_location.index] as u32;
+                letter_mul = crate::letter::LETTER_MULT
+                    .get(current_location.index)
+                    .cloned()
+                    .unwrap_or(0) as u32;
             }
             sum += Letter::from_char(l).score() as u32 * letter_mul;
 
