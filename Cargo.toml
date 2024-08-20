@@ -6,15 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-colored = "2.0.0"
 lazy_static = "1.4.0"
-serde = {version = "1.0.164", optional = true}
-serde_derive = {version = "1.0.164", optional = true}
-
-[profile.release]
-lto = true
-strip = true
-codegen-units = 1
+colored = { version = "2.0.0", optional = true }
+serde = { version = "1.0.164", optional = true }
+serde_derive = { version = "1.0.164", optional = true }
 
 [features]
 serde = ["dep:serde", "dep:serde_derive"]
+pretty-print = ["dep:colored"]

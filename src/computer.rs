@@ -160,7 +160,7 @@ pub fn verify_move(board: &Board, board_move: &Word, word_list: &[&str]) -> bool
             }
         }
 
-        // Check that all words formed are valid
+        // Check that all perpendicular words formed are valid
         let new_word = find_boundary_word(board, board_move, i, board_move.direction.opposite());
         if !new_word.is_empty()
             && !(word_list.contains(&&*new_word)
@@ -265,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn parallel_verification() {
+    fn perpendicular_verification() {
         let b = init_board();
         assert_eq!(
             computer::verify_move(

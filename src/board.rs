@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use crate::letter::Letter;
-use colored::Colorize;
 use core::fmt;
 use std::{borrow::Cow, ops::Add};
 
@@ -85,7 +84,9 @@ impl Board {
         }
     }
 
+    #[cfg(feature = "pretty-print")]
     pub fn print_highlight(&self, highlight: &[(Letter, Position)]) {
+        use colored::Colorize;
         for (i, l) in self.inner.iter().enumerate() {
             if i % self.size == 0 {
                 println!();
@@ -208,10 +209,10 @@ impl Word {
     /**
     Gets the score of a word on the board.
     Accounts for letter and word multipliers
-    Accounts for blank letters not having any score
 
     **TODO:**
     * Word extensions
+    * Account for blank letters not having any score
     */
     pub fn get_score(&self, board: &Board) -> u32 {
         let mut current_location = self.position;
