@@ -5,9 +5,4 @@ pub mod letter;
 pub use board::{Board, Direction, Position, Word};
 pub use letter::Letter;
 
-const DEFAULT_WORD_TEXT: &'static str = include_str!("../words.txt");
-lazy_static::lazy_static! {
-    pub static ref DEFAULT_WORD_LIST: Vec<&'static str> = {
-        DEFAULT_WORD_TEXT.lines().collect::<Vec<_>>()
-    };
-}
+pub const DEFAULT_WORD_LIST: &[&str] = &include!(concat!(env!("OUT_DIR"), "/words.rs"));

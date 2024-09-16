@@ -53,6 +53,32 @@ lazy_static::lazy_static! {
     feature = "serde",
     derive(serde_derive::Serialize, serde_derive::Deserialize)
 )]
+pub enum RackLetter {
+    Letter(Letter),
+    Blank,
+}
+
+impl RackLetter {
+    pub fn from_char(c: char) -> RackLetter {
+        match c {
+            ' ' => RackLetter::Blank,
+            _ => RackLetter::Letter(Letter::from_char(c)),
+        }
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            RackLetter::Blank => ' ',
+            RackLetter::Letter(letter) => letter.to_char(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Serialize, serde_derive::Deserialize)
+)]
 #[allow(unused)]
 #[repr(u8)]
 pub enum Letter {
@@ -82,13 +108,11 @@ pub enum Letter {
     X,
     Y,
     Z,
-    Blank,
 }
 
 impl Letter {
     pub fn from_char(c: char) -> Letter {
         match c {
-            ' ' => Self::Blank,
             _ => {
                 assert!(c.is_ascii_uppercase());
                 unsafe { core::mem::transmute(c as u8) }
@@ -98,7 +122,6 @@ impl Letter {
 
     pub fn to_char(self) -> char {
         match self {
-            Self::Blank => ' ',
             _ => self as u8 as char,
         }
     }
@@ -131,7 +154,6 @@ impl Letter {
             Letter::X => 8,
             Letter::Y => 4,
             Letter::Z => 10,
-            Letter::Blank => 0,
         }
     }
 }

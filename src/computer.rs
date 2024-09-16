@@ -5,6 +5,7 @@ use crate::board::Direction;
 use crate::board::Position;
 use crate::board::Word;
 use crate::letter::Letter;
+use crate::letter::RackLetter;
 
 /**
 Returns an iterator over the best moves to play, with the moves
@@ -18,14 +19,14 @@ out later when we iterate through them.
 */
 pub fn best_moves<'a>(
     board: &'a Board,
-    letters: &[Letter],
+    letters: &[RackLetter],
     word_list: &'a [&str],
 ) -> impl Iterator<Item = Word> + 'a {
     let mut rack = Vec::from(letters);
 
     let mut best: Vec<(u32, Word)> = Vec::new();
     for (location, letter) in board.enumerate_letters() {
-        rack.push(letter);
+        rack.push(RackLetter::Letter(letter));
 
         let words = word_list.iter().filter(|word| can_create_word(&rack, word));
 
@@ -52,14 +53,14 @@ pub fn best_moves<'a>(
 /**
 Returns if you can create the word `word` using the letters in `rack`
 */
-pub fn can_create_word(rack: &[Letter], word: &str) -> bool {
+pub fn can_create_word(rack: &[RackLetter], word: &str) -> bool {
     let mut rack = Vec::from(rack);
-    let mut blank_count = rack.iter().filter(|&&x| x == Letter::Blank).count();
+    let mut blank_count = rack.iter().filter(|&&x| x == RackLetter::Blank).count();
 
     'outer: for ch in word.chars() {
         for (i, letter) in rack.iter().enumerate() {
-            if *letter == Letter::from_char(ch) {
-                rack[i] = Letter::Blank;
+            if *letter == RackLetter::Letter(Letter::from_char(ch)) {
+                rack[i] = RackLetter::Blank;
                 continue 'outer;
             }
         }
@@ -254,13 +255,15 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn move_count() {
+        use crate::letter::RackLetter;
+
         let b = init_board();
         assert_eq!(
             computer::best_moves(
                 &b,
                 "ABCDEFG"
                     .chars()
-                    .map(|ch| Letter::from_char(ch))
+                    .map(|ch| RackLetter::Letter(Letter::from_char(ch)))
                     .collect::<Vec<_>>()
                     .as_slice(),
                 &crate::DEFAULT_WORD_LIST

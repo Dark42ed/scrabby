@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::{computer, letter::Letter};
 use core::fmt;
-use std::{borrow::Cow, ops::Add, sync::Arc};
+use std::borrow::Cow;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(
